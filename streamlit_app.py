@@ -109,19 +109,148 @@ def load_indobertweet_model():
         return mdl, "CPU"
 
 
-@st.cache_data(show_spinner=False)
-def load_kamus_alay() -> dict:
-    """Load kamus alay sekali, cache di memori."""
-    url = (
+# ─────────────────────────────────────────────────────────────
+# KAMUS ALAY – MULTI-SOURCE DOWNLOADER
+# ─────────────────────────────────────────────────────────────
+_KAMUS_SOURCES: list[tuple[str, str]] = [
+    # 1. nasalsabila CSV – sumber resmi, paling andal (4 300+ entri)
+    (
+        "csv",
+        "https://raw.githubusercontent.com/nasalsabila/kamus-alay/master/"
+        "colloquial-indonesian-lexicon.csv",
+    ),
+    # 2. onpilot JSON combined (mirror)
+    (
+        "json",
         "https://raw.githubusercontent.com/onpilot/sentimen-bahasa/master/"
-        "kamus/nasalsabila_kamus-alay/_json_combined.json"
+        "kamus/nasalsabila_kamus-alay/_json_combined.json",
+    ),
+    # 3. Fallback JSON lain di repo yang sama
+    (
+        "json",
+        "https://raw.githubusercontent.com/onpilot/sentimen-bahasa/master/"
+        "kamus/colloquial-indonesian-lexicon.json",
+    ),
+]
+
+_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/120.0.0.0 Safari/537.36"
     )
+}
+
+
+def _parse_kamus_csv(content: str) -> dict:
+    """Parse CSV kamus alay dengan kolom 'slang' dan 'formal'."""
+    from io import StringIO
+
     try:
-        resp = requests.get(url, timeout=15)
-        resp.raise_for_status()
-        return resp.json()
+        df_k = pd.read_csv(StringIO(content), dtype=str)
     except Exception:
         return {}
+
+    # coba berbagai nama kolom yang umum
+    candidate_pairs = [
+        ("slang", "formal"),
+        ("kataAlay", "kataBaik"),
+        ("kata_salah", "kata_benar"),
+        ("kata_alay", "kata_baku"),
+    ]
+    for sc, fc in candidate_pairs:
+        if sc in df_k.columns and fc in df_k.columns:
+            df_k = df_k.dropna(subset=[sc, fc])
+            return dict(
+                zip(
+                    df_k[sc].astype(str).str.strip().str.lower(),
+                    df_k[fc].astype(str).str.strip().str.lower(),
+                )
+            )
+
+    # jika tidak ada kolom yang dikenali, gunakan dua kolom pertama
+    if df_k.shape[1] >= 2:
+        df_k = df_k.dropna(subset=[df_k.columns[0], df_k.columns[1]])
+        return dict(
+            zip(
+                df_k.iloc[:, 0].astype(str).str.strip().str.lower(),
+                df_k.iloc[:, 1].astype(str).str.strip().str.lower(),
+            )
+        )
+    return {}
+
+
+def _download_kamus_from_url(fmt: str, url: str) -> tuple[dict, str]:
+    """
+    Coba unduh kamus dari satu URL.
+    Returns (dict_hasil, nama_sumber). dict kosong jika gagal.
+    """
+    try:
+        resp = requests.get(url, timeout=20, headers=_HEADERS)
+        resp.raise_for_status()
+        if fmt == "csv":
+            data = _parse_kamus_csv(resp.text)
+        else:  # json
+            raw = resp.json()
+            data = raw if isinstance(raw, dict) else {}
+
+        if len(data) > 50:          # dianggap valid jika > 50 entri
+            return data, url
+    except Exception:
+        pass
+    return {}, url
+
+
+def download_kamus_alay(progress_callback=None) -> tuple[dict, str]:
+    """
+    Coba semua sumber secara berurutan.
+    Returns (kamus_dict, sumber_url).  dict kosong jika semua gagal.
+    """
+    for i, (fmt, url) in enumerate(_KAMUS_SOURCES):
+        if progress_callback:
+            progress_callback(i, len(_KAMUS_SOURCES), url)
+        data, src = _download_kamus_from_url(fmt, url)
+        if data:
+            return data, src
+    return {}, ""
+
+
+def parse_kamus_from_upload(uploaded_file) -> tuple[dict, str]:
+    """
+    Parse kamus alay dari file yang di-upload user.
+    Mendukung .csv, .json, .txt (format: slang=formal per baris)
+    """
+    fname = uploaded_file.name.lower()
+    try:
+        if fname.endswith(".json"):
+            raw = json.load(uploaded_file)
+            if isinstance(raw, dict):
+                return raw, "upload (JSON)"
+        elif fname.endswith(".csv"):
+            content = uploaded_file.read().decode("utf-8", errors="replace")
+            data = _parse_kamus_csv(content)
+            if data:
+                return data, "upload (CSV)"
+        elif fname.endswith(".txt"):
+            lines = uploaded_file.read().decode("utf-8", errors="replace").splitlines()
+            data = {}
+            for ln in lines:
+                if "=" in ln:
+                    k, v = ln.split("=", 1)
+                    data[k.strip().lower()] = v.strip().lower()
+                elif "," in ln:
+                    parts = ln.split(",", 1)
+                    data[parts[0].strip().lower()] = parts[1].strip().lower()
+            if data:
+                return data, "upload (TXT)"
+    except Exception:
+        pass
+    return {}, ""
+
+
+def get_kamus_alay() -> dict:
+    """Ambil kamus dari session state (sudah diunduh sebelumnya)."""
+    return st.session_state.get("kamus_alay") or {}
 
 
 # ─────────────────────────────────────────────────────────────
@@ -189,6 +318,8 @@ _ALL_KEYS = [
     "tfidf", "X_train_tfidf", "X_test_tfidf",
     "nb_model", "svm_model", "y_pred_nb", "y_pred_svm",
     "df_doc_freq", "valid_keywords",
+    # kamus disimpan terpisah agar tidak ikut terhapus saat ganti dataset
+    # (hapus manual lewat tombol "Reset Kamus")
 ]
 
 
@@ -663,31 +794,127 @@ def page_dataset() -> None:
         expanded=st.session_state["df_filtered"] is not None,
     ):
         st.markdown(
-            '<p class="step-note">Mengganti kata tidak baku / slang menggunakan kamus alay. '
-            "Membutuhkan koneksi internet untuk mengunduh kamus.</p>",
+            '<p class="step-note">Mengganti kata tidak baku / slang menggunakan kamus alay '
+            "(nasalsabila – 4 300+ entri). Kamus diunduh otomatis dari tiga sumber; "
+            "jika semua gagal, Anda bisa upload file kamus secara manual.</p>",
             unsafe_allow_html=True,
         )
         if st.session_state["df_filtered"] is None:
             st.warning("⚠️ Selesaikan Filter terlebih dahulu.")
         else:
-            if st.button("▶ Jalankan Normalisasi", key="btn_norm"):
-                with st.spinner("Mengunduh kamus alay…"):
-                    kamus = load_kamus_alay()
+            # ── Status kamus saat ini ────────────────────────
+            kamus_now: dict = get_kamus_alay()
+            kamus_src: str = st.session_state.get("kamus_src", "")
 
-                if kamus:
-                    st.info(f"📚 {len(kamus):,} kata dalam kamus normalisasi.")
-                else:
-                    st.warning(
-                        "⚠️ Kamus tidak dapat diunduh. Teks asli digunakan tanpa normalisasi."
+            if kamus_now:
+                st.success(
+                    f"📚 Kamus tersedia: **{len(kamus_now):,}** entri  "
+                    f"{'| Sumber: ' + kamus_src if kamus_src else ''}"
+                )
+            else:
+                st.info("ℹ️ Kamus belum diunduh. Klik tombol di bawah untuk mengunduh.")
+
+            # ── Tombol unduh / retry ─────────────────────────
+            c_dl, c_clr = st.columns([3, 1])
+            btn_label = "🔄 Retry Unduh Kamus" if kamus_now else "⬇️ Unduh Kamus Alay"
+            do_download = c_dl.button(btn_label, key="btn_dl_kamus")
+            if c_clr.button("🗑️ Reset Kamus", key="btn_clr_kamus"):
+                st.session_state["kamus_alay"] = {}
+                st.session_state["kamus_src"] = ""
+                st.rerun()
+
+            if do_download:
+                prog_bar = st.progress(0.0, text="Menghubungi server…")
+                status_ph = st.empty()
+
+                def _cb(i: int, total: int, url: str) -> None:
+                    prog_bar.progress(
+                        (i + 0.5) / total,
+                        text=f"Mencoba sumber {i + 1}/{total}: {url[:60]}…",
                     )
 
-                df = st.session_state["df_filtered"].copy()
-                df["normalized_text"] = df["case_folded_text"].apply(
-                    lambda t: normalize_text(t, kamus)
+                kamus_dl, src_dl = download_kamus_alay(progress_callback=_cb)
+                prog_bar.empty()
+
+                if kamus_dl:
+                    st.session_state["kamus_alay"] = kamus_dl
+                    st.session_state["kamus_src"] = src_dl
+                    status_ph.success(
+                        f"✅ Kamus berhasil diunduh: **{len(kamus_dl):,}** kata  \n"
+                        f"Sumber: `{src_dl}`"
+                    )
+                    st.rerun()
+                else:
+                    status_ph.error(
+                        "❌ Semua sumber gagal diunduh.\n\n"
+                        "Penyebab umum: tidak ada koneksi internet, atau GitHub "
+                        "sedang tidak dapat diakses.\n\n"
+                        "**Solusi:** Upload file kamus secara manual di bawah."
+                    )
+
+            # ── Manual Upload Kamus ───────────────────────────
+            with st.expander("📂 Upload Kamus Manual (CSV / JSON / TXT)", expanded=not kamus_now):
+                st.markdown(
+                    "Download file CSV dari: "
+                    "[nasalsabila/kamus-alay](https://raw.githubusercontent.com/nasalsabila/"
+                    "kamus-alay/master/colloquial-indonesian-lexicon.csv) "
+                    "kemudian upload di sini.  \n"
+                    "Format yang didukung: **CSV** (kolom `slang`,`formal`), "
+                    "**JSON** (`{\"slang\":\"formal\"}`), "
+                    "**TXT** (`slang=formal` per baris)."
                 )
+                kamus_file = st.file_uploader(
+                    "Pilih file kamus:",
+                    type=["csv", "json", "txt"],
+                    key="fu_kamus",
+                )
+                if kamus_file is not None:
+                    kamus_up, src_up = parse_kamus_from_upload(kamus_file)
+                    if kamus_up:
+                        st.session_state["kamus_alay"] = kamus_up
+                        st.session_state["kamus_src"] = src_up
+                        st.success(
+                            f"✅ Kamus dimuat dari upload: **{len(kamus_up):,}** entri"
+                        )
+                        st.rerun()
+                    else:
+                        st.error(
+                            "❌ Gagal membaca file. Pastikan format sesuai "
+                            "(CSV dengan kolom slang/formal, atau JSON dict)."
+                        )
+
+            st.markdown("---")
+            # ── Tombol jalankan normalisasi ───────────────────
+            kamus_final = get_kamus_alay()
+            if not kamus_final:
+                st.warning(
+                    "⚠️ Kamus belum tersedia. Unduh atau upload kamus terlebih dahulu, "
+                    "**atau** klik tombol di bawah untuk normalisasi tanpa kamus "
+                    "(teks asli digunakan langsung)."
+                )
+
+            col_run, col_skip = st.columns([3, 1])
+            btn_run = col_run.button("▶ Jalankan Normalisasi", key="btn_norm")
+            btn_skip = col_skip.button("⏭ Lewati (tanpa normalisasi)", key="btn_norm_skip")
+
+            if btn_run or btn_skip:
+                df = st.session_state["df_filtered"].copy()
+                if btn_skip or not kamus_final:
+                    # pakai teks apa adanya
+                    df["normalized_text"] = df["case_folded_text"]
+                    msg = "✅ Normalisasi dilewati – kolom case_folded_text digunakan langsung."
+                else:
+                    with st.spinner(f"Menormalisasi {len(df):,} baris…"):
+                        df["normalized_text"] = df["case_folded_text"].apply(
+                            lambda t: normalize_text(t, kamus_final)
+                        )
+                    msg = (
+                        f"✅ Normalisasi selesai dengan **{len(kamus_final):,}** entri kamus!"
+                    )
+
                 clear_from("df_normalized")
                 st.session_state["df_normalized"] = df
-                st.success("✅ Normalisasi selesai!")
+                st.success(msg)
 
             if st.session_state["df_normalized"] is not None:
                 st.markdown("**Hasil Normalisasi (5 baris/hal):**")
@@ -1130,7 +1357,13 @@ def page_single() -> None:
         with st.spinner("Memproses teks…"):
             cleaned = clean_text(input_text)
             folded = case_fold(cleaned)
-            kamus = load_kamus_alay()
+            kamus = get_kamus_alay()
+            if not kamus:
+                # coba unduh sekali di background jika belum ada
+                kamus, src = download_kamus_alay()
+                if kamus:
+                    st.session_state["kamus_alay"] = kamus
+                    st.session_state["kamus_src"] = src
             normed = normalize_text(folded, kamus)
 
             model, dev = load_indobertweet_model()
