@@ -15,30 +15,32 @@ from sklearn.svm import LinearSVC
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 
 # ==========================================
-# KONFIGURASI DAN FUNGSI PENDUKUNG
+# KONFIGURASI HALAMAN
 # ==========================================
-st.set_page_config(page_title="Analisis Sentimen IndoBERTweet", layout="wide")
+st.set_page_config(page_title="Analisis Sentimen IndoBerTweet", layout="wide")
 
-@st.cache_resource(show_spinner=False)
-def load_indobertweet():
-    # Cache model pipeline agar tidak download/load berulang kali
-    return pipeline("sentiment-analysis", model="Aardiiiiy/indobertweet-base-Indonesian-sentiment-analysis")
+# ==========================================
+# FUNGSI BANTUAN (HELPER FUNCTIONS)
+# ==========================================
+def clear_cache_if_new_file(uploaded_file):
+    if uploaded_file is not None:
+        if 'last_uploaded_file' not in st.session_state or st.session_state['last_uploaded_file'] != uploaded_file.name:
+            st.session_state.clear()
+            st.session_state['last_uploaded_file'] = uploaded_file.name
 
-@st.cache_resource(show_spinner=False)
-def load_kamus_alay():
-    url = 'https://raw.githubusercontent.com/onpilot/sentimen-bahasa/master/kamus/nasalsabila_kamus-alay/_json_colloc'
-    try:
-        response = requests.get(url)
-        return response.json()
-    except:
-        return {}
+def display_paginated(df, key_prefix, page_size=5):
+    total_pages = max(1, len(df) // page_size + (1 if len(df) % page_size > 0 else 0))
+    page_number = st.number_input(f"Halaman (1 - {total_pages})", min_value=1, max_value=total_pages, value=1, step=1, key=f"page_{key_prefix}")
+    start_idx = (page_number - 1) * page_size
+    end_idx = start_idx + page_size
+    st.dataframe(df.iloc[start_idx:end_idx], use_container_width=True)
 
 def advanced_clean_text(text):
     if not isinstance(text, str): return ""
     text = html.unescape(text)
-    text = re.sub(r'[^\x00-\x7F]+','', text)
-    text = re.sub(r'http[s]?\:\/\/.[a-zA-Z0-9\.\/\_?=%&#\-\+!]+','', text)
-    text = re.sub(r'pic\.twitter\.com?.[a-zA-Z0-9\.\/\_?=%&#\-\+!]+','', text)
+    text = re.sub(r'[^\x00-\x7F]+', '', text)
+    text = re.sub(r'http[s]?\:\/\/.[a-zA-Z0-9\.\/\_?=%&#\-\+!]+', '', text)
+    text = re.sub(r'pic.twitter.com?.[a-zA-Z0-9\.\/\_?=%&#\-\+!]+', '', text)
     text = re.sub(r'\@([\w]+)', '', text)
     text = re.sub(r'\#([\w]+)', '', text)
     text = re.sub(r'[!\$%^&*@#()_+~={}\[\]%\-:";\'<>?,.\/]', '', text)
@@ -47,305 +49,281 @@ def advanced_clean_text(text):
     text = re.sub(r' +', ' ', text)
     return text.strip()
 
-def normalize_text(text, kamus_normalisasi):
+@st.cache_data
+def load_kamus_alay():
+    url_kamus = 'https://raw.githubusercontent.com/onpilot/sentimen-bahasa/master/kamus/nasalsabila_kamus-alay/_json_colloc'
+    try:
+        response = requests.get(url_kamus)
+        return response.json()
+    except:
+        return {}
+
+def normalize_text(text, kamus):
     if not isinstance(text, str) or not text.strip(): return ""
     words = text.split()
-    normalized_words = [kamus_normalisasi.get(word, word) for word in words]
+    normalized_words = [kamus.get(word, word) for word in words]
     return " ".join(normalized_words)
+
+@st.cache_resource
+def load_indobertweet():
+    model_name = "Aardiiiiy/indobertweet-base-Indonesian-sentiment-analysis"
+    return pipeline("sentiment-analysis", model=model_name, tokenizer=model_name)
 
 def label_indobertweet_biner(text, nlp_model):
     if not isinstance(text, str) or not text.strip(): return "Positif", 0.0
     try:
-        hasil = nlp_model(text[:512], truncation=True, top_k=None)
-        if isinstance(hasil[0], list): hasil = hasil[0]
+        hasil_semua = nlp_model(text[:512], truncation=True, top_k=None)
+        if isinstance(hasil_semua[0], list): hasil_semua = hasil_semua[0]
         skor_pos, skor_neg = 0.0, 0.0
-        for item in hasil:
-            label = item['label'].lower()
-            if 'pos' in label or label == 'label_2': skor_pos = item['score']
-            elif 'neg' in label or label == 'label_0': skor_neg = item['score']
-        
+        for item in hasil_semua:
+            lbl = item['label'].lower()
+            if 'pos' in lbl or lbl == 'label_2': skor_pos = item['score']
+            elif 'neg' in lbl or lbl == 'label_0': skor_neg = item['score']
         total = skor_pos + skor_neg
         if total == 0: return "Positif", 0.0
-        
-        skor_pos_norm = skor_pos / total
-        skor_neg_norm = skor_neg / total
-        if skor_pos_norm > skor_neg_norm: return "Positif", skor_pos_norm
-        else: return "Negatif", skor_neg_norm
+        if (skor_pos/total) > (skor_neg/total): return "Positif", (skor_pos/total)
+        return "Negatif", (skor_neg/total)
     except:
         return "Positif", 0.0
 
-def display_paginated(df, key_prefix):
-    # Fitur Pagination: Menampilkan 5 data per halaman
-    page_size = 5
-    total_pages = max(1, (len(df) - 1) // page_size + 1)
-    page = st.number_input("Halaman", min_value=1, max_value=total_pages, step=1, key=f"{key_prefix}_page")
-    start_idx = (page - 1) * page_size
-    st.dataframe(df.iloc[start_idx : start_idx + page_size], use_container_width=True)
-
-def plot_confusion_matrix(y_true, y_pred, title):
-    cm = confusion_matrix(y_true, y_pred, labels=["Positif", "Negatif"])
-    fig, ax = plt.subplots(figsize=(5, 4))
-    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
-                xticklabels=["Prediksi Positif", "Prediksi Negatif"],
-                yticklabels=["Asli Positif", "Asli Negatif"], ax=ax)
-    ax.set_title(title, fontweight='bold')
-    plt.tight_layout()
-    return fig
-
-def generate_wordcloud(text, colormap):
-    wc = WordCloud(width=800, height=400, background_color='white', 
-                   colormap=colormap, max_words=100).generate(text)
-    fig, ax = plt.subplots(figsize=(8, 4))
-    ax.imshow(wc, interpolation='bilinear')
-    ax.axis('off')
-    return fig
-
 # ==========================================
-# UI APLIKASI
+# UI APLIKASI UTAMA
 # ==========================================
-st.title("Aplikasi Analisis Sentimen IndoBERTweet")
+st.title("Aplikasi Analisis Sentimen IndoBerTweet")
 
 tab1, tab2 = st.tabs(["Fitur 1: Analisis Dataset", "Fitur 2: Prediksi Teks Tunggal"])
 
 with tab1:
-    st.header("Upload & Preprocessing Dataset")
-    
-    # 1. Upload File
-    uploaded_file = st.file_uploader("Upload file dataset (CSV atau Excel)", type=['csv', 'xlsx'])
+    st.header("1. Upload Dataset")
+    uploaded_file = st.file_uploader("Upload file CSV atau Excel", type=["csv", "xlsx"])
     
     if uploaded_file is not None:
-        # Hapus state lama jika upload file baru agar tidak ada cache tersisa
-        if 'last_upload' not in st.session_state or st.session_state['last_upload'] != uploaded_file.name:
-            st.session_state.clear()
-            st.session_state['last_upload'] = uploaded_file.name
-            
-            if uploaded_file.name.endswith('.csv'):
-                st.session_state['df_raw'] = pd.read_csv(uploaded_file)
-            else:
-                st.session_state['df_raw'] = pd.read_excel(uploaded_file)
-                
-        df = st.session_state['df_raw'].copy()
+        clear_cache_if_new_file(uploaded_file)
         
-        st.subheader("Pengaturan Analisis")
-        col1, col2 = st.columns(2)
-        with col1:
-            # 2. Pilih Kolom dengan peringatan
-            text_columns = df.select_dtypes(include=['object', 'string']).columns.tolist()
-            col_text = st.selectbox("Pilih kolom isi teks:", text_columns, help="Peringatan: Pastikan kolom yang dipilih hanya memuat/memproses data teks!")
+        # Load Data
+        if uploaded_file.name.endswith('.csv'):
+            df = pd.read_csv(uploaded_file)
+        else:
+            df = pd.read_excel(uploaded_file)
             
-            date_columns = ["None"] + list(df.columns)
-            col_date = st.selectbox("Pilih kolom tanggal (Opsional):", date_columns)
-            
-        with col2:
-            st.write("Range Tahun (jika ada kolom tanggal):")
-            c_start, c_end = st.columns(2)
-            start_year = c_start.number_input("Tahun Mulai", value=2022)
-            end_year = c_end.number_input("Tahun Akhir", value=2025)
-            
-            keyword_input = st.text_input("Masukkan Keyword (pisahkan koma)", "polri, kepolisian, polisi")
-            
-        # 5. Data Split Setting
-        train_ratio = st.slider("Persentase Data Latih (Train)", min_value=50, max_value=90, value=80, step=5)
+        st.write("Preview Data Original:")
+        st.dataframe(df.head(), use_container_width=True)
         
-        if st.button("🚀 Mulai Analisis & Pemrosesan"):
-            st.session_state['process_done'] = True
-            with st.spinner("Memproses data... Mohon tunggu!"):
-                # Menyiapkan tools
-                nlp_model = load_indobertweet()
-                kamus_alay = load_kamus_alay()
+        st.header("2. Pilih Kolom Target")
+        st.warning("⚠️ Peringatan: Pastikan kolom yang dipilih hanya memuat/memproses data teks (string).")
+        kolom_teks = st.selectbox("Pilih kolom yang berisi teks:", df.columns)
+        
+        st.header("3. Konfigurasi Pemrosesan")
+        keywords_input = st.text_input("Masukkan Keywords (pisahkan dengan koma):", "polri, polisi, polda, polres")
+        tahun_input = st.text_input("Masukkan Range Tahun (pisahkan dengan koma):", "2022, 2023, 2024, 2025")
+        kolom_tahun = st.selectbox("Pilih kolom tanggal/tahun (opsional):", ["Tidak Ada"] + list(df.columns))
+        
+        train_ratio = st.slider("Rasio Data Train (%)", min_value=50, max_value=90, value=80, step=5)
+        test_ratio = 100 - train_ratio
+        st.info(f"Pembagian Data: {train_ratio}% Train / {test_ratio}% Test")
+        
+        if st.button("Mulai Pemrosesan Data"):
+            with st.spinner("Memproses data... Ini mungkin memakan waktu."):
                 
-                df.dropna(subset=[col_text], inplace=True)
-                df.drop_duplicates(subset=[col_text], inplace=True)
-                
-                # 3.1 Cleaning
-                df['cleaned_text'] = df[col_text].apply(advanced_clean_text)
-                df = df[df['cleaned_text'].str.strip().astype(bool)].copy()
-                st.session_state['df_clean'] = df[[col_text, 'cleaned_text']].copy()
+                # 3.1 Cleaning Data
+                df_clean = df.copy()
+                df_clean.dropna(subset=[kolom_teks], inplace=True)
+                df_clean['cleaned_text'] = df_clean[kolom_teks].astype(str).apply(advanced_clean_text)
+                df_clean = df_clean[df_clean['cleaned_text'].str.strip().astype(bool)]
+                df_clean.drop_duplicates(subset=['cleaned_text'], keep='first', inplace=True)
+                st.session_state['df_clean'] = df_clean
                 
                 # 3.2 Case Folding
-                df['case_folded_text'] = df['cleaned_text'].str.lower()
-                st.session_state['df_case'] = df[['cleaned_text', 'case_folded_text']].copy()
+                df_clean['case_folded'] = df_clean['cleaned_text'].str.lower()
+                st.session_state['df_case'] = df_clean
                 
-                # 3.3 Keyword & Year Filtering
-                if col_date != "None":
-                    df['parsed_date'] = pd.to_datetime(df[col_date], errors='coerce')
-                    df = df[df['parsed_date'].dt.year.between(start_year, end_year)]
+                # 3.3 Filtering
+                keywords = [k.strip().lower() for k in keywords_input.split(',')]
+                pattern = r'\b(?:' + '|'.join(map(re.escape, keywords)) + r')\b'
+                mask_keyword = df_clean['case_folded'].str.contains(pattern, flags=re.IGNORECASE, na=False)
+                df_filter = df_clean[mask_keyword].copy()
                 
-                keywords = [k.strip().lower() for k in keyword_input.split(',') if k.strip()]
-                if keywords:
-                    pattern = r'\b(?:' + '|'.join(map(re.escape, keywords)) + r')\b'
-                    mask = df['case_folded_text'].str.contains(pattern, flags=re.IGNORECASE, na=False)
-                    df = df[mask].reset_index(drop=True)
-                
-                if df.empty:
-                    st.error("Tidak ada data tersisa setelah difilter tahun & keyword!")
-                    st.stop()
-                    
-                st.session_state['df_filter'] = df[['case_folded_text']].copy()
+                if kolom_tahun != "Tidak Ada":
+                    target_years = [int(y.strip()) for y in tahun_input.split(',')]
+                    df_filter['created_at'] = pd.to_datetime(df_filter[kolom_tahun], errors='coerce')
+                    df_filter['year_temp'] = df_filter['created_at'].dt.year
+                    df_filter = df_filter[df_filter['year_temp'].isin(target_years)].copy()
+                st.session_state['df_filter'] = df_filter
                 
                 # 3.4 Normalization
-                df['normalized_text'] = df['case_folded_text'].apply(lambda x: normalize_text(x, kamus_alay))
-                st.session_state['df_norm'] = df[['case_folded_text', 'normalized_text']].copy()
+                kamus = load_kamus_alay()
+                df_filter['normalized'] = df_filter['case_folded'].apply(lambda x: normalize_text(x, kamus))
+                st.session_state['df_norm'] = df_filter
                 
-                # 4. Labeling IndoBERTweet
-                df['label_info'] = df['normalized_text'].apply(lambda x: label_indobertweet_biner(x, nlp_model))
-                df['label'] = df['label_info'].apply(lambda x: x[0])
-                df['indobertweet_score'] = df['label_info'].apply(lambda x: x[1])
-                st.session_state['df_labeled'] = df[['normalized_text', 'label', 'indobertweet_score']].copy()
+                # 4. Labeling
+                nlp_model = load_indobertweet()
+                results = df_filter['normalized'].apply(lambda x: label_indobertweet_biner(x, nlp_model))
+                df_filter['label'] = results.apply(lambda x: x[0])
+                df_filter['score'] = results.apply(lambda x: x[1])
+                st.session_state['df_label'] = df_filter
                 
-                # Split Data
-                X = df['normalized_text']
-                y = df['label']
-                test_size = 1.0 - (train_ratio / 100.0)
-                X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=42, stratify=y)
-                st.session_state['split_info'] = {"train": len(X_train), "test": len(X_test)}
+                # 5. Data Split
+                X = df_filter['normalized'].astype(str)
+                y = df_filter['label']
+                X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=(test_ratio/100.0), random_state=42, stratify=y)
+                st.session_state['split_data'] = (X_train, X_test, y_train, y_test)
                 
-                # 6. TF-IDF & Document Frequency
+                # 6. TF-IDF
                 tfidf = TfidfVectorizer(ngram_range=(1, 2), max_features=5000, sublinear_tf=True)
-                X_train_tf = tfidf.fit_transform(X_train)
-                X_test_tf = tfidf.transform(X_test)
+                X_train_tfidf = tfidf.fit_transform(X_train)
+                X_test_tfidf = tfidf.transform(X_test)
+                st.session_state['tfidf'] = tfidf
+                st.session_state['tfidf_matrices'] = (X_train_tfidf, X_test_tfidf)
                 
-                doc_freq = (X_train_tf > 0).sum(axis=0).A1
-                feature_names = tfidf.get_feature_names_out()
+                # Document Frequency Plot
+                doc_freq = (X_train_tfidf > 0).sum(axis=0).A1
+                terms = tfidf.get_feature_names_out()
+                df_df = pd.DataFrame({'Term': terms, 'DF': doc_freq})
+                valid_keywords = [k for k in keywords if k in terms]
+                df_kw_df = df_df[df_df['Term'].isin(valid_keywords)].sort_values('DF', ascending=False)
+                st.session_state['df_kw_df'] = df_kw_df
                 
-                df_freq_list = []
-                for kw in keywords:
-                    if kw in feature_names:
-                        idx = np.where(feature_names == kw)[0][0]
-                        df_freq_list.append({"Keyword": kw, "Document Frequency": int(doc_freq[idx])})
-                df_keyword_freq = pd.DataFrame(df_freq_list).sort_values("Document Frequency", ascending=False)
-                st.session_state['df_freq'] = df_keyword_freq
-                
-                # 7 & 8. Modeling
+                # 7. Modeling
                 nb_model = MultinomialNB()
-                nb_model.fit(X_train_tf, y_train)
-                y_pred_nb = nb_model.predict(X_test_tf)
+                nb_model.fit(X_train_tfidf, y_train)
+                st.session_state['nb_model'] = nb_model
                 
                 svm_model = LinearSVC(random_state=42)
-                svm_model.fit(X_train_tf, y_train)
-                y_pred_svm = svm_model.predict(X_test_tf)
-                
-                st.session_state['nb_model'] = nb_model
+                svm_model.fit(X_train_tfidf, y_train)
                 st.session_state['svm_model'] = svm_model
-                st.session_state['tfidf'] = tfidf
                 
-                st.session_state['metrics'] = {
-                    "nb_acc": accuracy_score(y_test, y_pred_nb),
-                    "svm_acc": accuracy_score(y_test, y_pred_svm),
-                    "nb_report": classification_report(y_test, y_pred_nb, zero_division=0),
-                    "svm_report": classification_report(y_test, y_pred_svm, zero_division=0),
-                    "y_test": y_test,
-                    "y_pred_nb": y_pred_nb,
-                    "y_pred_svm": y_pred_svm
-                }
-                
-                # 9. Wordcloud
-                pos_text = " ".join(df[df['label'] == 'Positif']['normalized_text'].dropna())
-                neg_text = " ".join(df[df['label'] == 'Negatif']['normalized_text'].dropna())
-                
-                if pos_text: st.session_state['wc_pos'] = generate_wordcloud(pos_text, 'Greens')
-                if neg_text: st.session_state['wc_neg'] = generate_wordcloud(neg_text, 'Reds')
-                
-        # Menampilkan Hasil setelah diproses (Di Luar scope Button)
-        if st.session_state.get('process_done'):
-            st.success("Proses Analisis Selesai!")
-            
-            with st.expander("3.1 Hasil Cleaning Data", expanded=True):
-                display_paginated(st.session_state['df_clean'], "clean")
-                
-            with st.expander("3.2 Hasil Case Folding"):
-                display_paginated(st.session_state['df_case'], "case")
-                
-            with st.expander("3.3 Hasil Filter Keyword & Tahun"):
-                display_paginated(st.session_state['df_filter'], "filter")
-                
-            with st.expander("3.4 Hasil Normalisasi"):
-                display_paginated(st.session_state['df_norm'], "norm")
-                
-            with st.expander("4. Hasil Pelabelan IndoBERTweet"):
-                display_paginated(st.session_state['df_labeled'], "label")
-                
-            with st.expander("5. Info Split Data"):
-                st.write(f"Distribusi Split Ratio -> Data Train: **{st.session_state['split_info']['train']}** baris | Data Test: **{st.session_state['split_info']['test']}** baris")
-                
-            with st.expander("6. TF-IDF & Keyword Document Frequency"):
-                if not st.session_state['df_freq'].empty:
-                    st.dataframe(st.session_state['df_freq'], use_container_width=True)
-                else:
-                    st.write("Tidak ada keyword filter yang terdaftar di top term TF-IDF.")
-                    
-            with st.expander("7. Hasil Evaluasi Model"):
-                m = st.session_state['metrics']
-                colA, colB = st.columns(2)
-                with colA:
-                    st.subheader(f"Naive Bayes (Akurasi: {m['nb_acc']:.4f})")
-                    st.text(m['nb_report'])
-                with colB:
-                    st.subheader(f"SVM (Akurasi: {m['svm_acc']:.4f})")
-                    st.text(m['svm_report'])
-                    
-            with st.expander("8. Confusion Matrix"):
-                m = st.session_state['metrics']
-                colA, colB = st.columns(2)
-                with colA: st.pyplot(plot_confusion_matrix(m['y_test'], m['y_pred_nb'], "Naive Bayes"))
-                with colB: st.pyplot(plot_confusion_matrix(m['y_test'], m['y_pred_svm'], "SVM"))
-                    
-            with st.expander("9. Wordcloud"):
-                colA, colB = st.columns(2)
-                if 'wc_pos' in st.session_state:
-                    with colA:
-                        st.subheader("Sentimen Positif")
-                        st.pyplot(st.session_state['wc_pos'])
-                if 'wc_neg' in st.session_state:
-                    with colB:
-                        st.subheader("Sentimen Negatif")
-                        st.pyplot(st.session_state['wc_neg'])
+                st.success("Pemrosesan selesai! Silakan lihat hasil di bawah.")
 
+        # ==========================================
+        # RENDER HASIL PEMROSESAN (DENGAN PAGINATION)
+        # ==========================================
+        if 'df_clean' in st.session_state:
+            st.subheader("3.1 Hasil Cleaning Data (Hapus Duplikat & Karakter)")
+            display_paginated(st.session_state['df_clean'][[kolom_teks, 'cleaned_text']], "clean")
+            
+            st.subheader("3.2 Hasil Case Folding")
+            display_paginated(st.session_state['df_case'][['cleaned_text', 'case_folded']], "case")
+            
+            st.subheader("3.3 Hasil Filtering Keyword & Tahun")
+            display_paginated(st.session_state['df_filter'][['case_folded']], "filter")
+            
+            st.subheader("3.4 Hasil Normalisasi")
+            display_paginated(st.session_state['df_norm'][['case_folded', 'normalized']], "norm")
+            
+            st.subheader("4. Hasil Pelabelan IndoBerTweet")
+            display_paginated(st.session_state['df_label'][['normalized', 'label', 'score']], "label")
+            
+            st.subheader("5. Hasil Data Split")
+            X_train, X_test, y_train, y_test = st.session_state['split_data']
+            st.write(f"Total Data Latih (Train): **{len(X_train)}**")
+            st.write(f"Total Data Uji (Test): **{len(X_test)}**")
+            
+            st.subheader("6. Distribusi TF-IDF (Document Frequency)")
+            df_kw_df = st.session_state['df_kw_df']
+            if not df_kw_df.empty:
+                fig, ax = plt.subplots(figsize=(10, 5))
+                sns.barplot(x='DF', y='Term', data=df_kw_df, palette='Blues_r', ax=ax)
+                ax.set_title("Document Frequency berdasarkan Keyword")
+                st.pyplot(fig)
+            else:
+                st.write("Tidak ada keyword yang valid ditemukan dalam matriks TF-IDF.")
+                
+            st.subheader("7 & 8. Evaluasi Model & Confusion Matrix")
+            X_train_tfidf, X_test_tfidf = st.session_state['tfidf_matrices']
+            nb_pred = st.session_state['nb_model'].predict(X_test_tfidf)
+            svm_pred = st.session_state['svm_model'].predict(X_test_tfidf)
+            
+            st.session_state['eval_nb'] = classification_report(y_test, nb_pred, output_dict=True)
+            st.session_state['eval_svm'] = classification_report(y_test, svm_pred, output_dict=True)
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown("**Naive Bayes Performance**")
+                st.text(classification_report(y_test, nb_pred))
+                fig1, ax1 = plt.subplots(figsize=(5, 4))
+                sns.heatmap(confusion_matrix(y_test, nb_pred, labels=["Positif", "Negatif"]), annot=True, fmt='d', cmap='Blues', xticklabels=["Pred Positif", "Pred Negatif"], yticklabels=["Asli Positif", "Asli Negatif"])
+                st.pyplot(fig1)
+                
+            with col2:
+                st.markdown("**SVM Performance**")
+                st.text(classification_report(y_test, svm_pred))
+                fig2, ax2 = plt.subplots(figsize=(5, 4))
+                sns.heatmap(confusion_matrix(y_test, svm_pred, labels=["Positif", "Negatif"]), annot=True, fmt='d', cmap='Blues', xticklabels=["Pred Positif", "Pred Negatif"], yticklabels=["Asli Positif", "Asli Negatif"])
+                st.pyplot(fig2)
+                
+            st.subheader("9. Wordcloud Sentimen")
+            df_label = st.session_state['df_label']
+            teks_pos = " ".join(df_label[df_label['label'] == 'Positif']['normalized'].dropna().astype(str))
+            teks_neg = " ".join(df_label[df_label['label'] == 'Negatif']['normalized'].dropna().astype(str))
+            
+            col_wc1, col_wc2 = st.columns(2)
+            with col_wc1:
+                if teks_pos.strip():
+                    wc_pos = WordCloud(width=400, height=300, background_color='white', colormap='Greens', max_words=100).generate(teks_pos)
+                    fig_wc1, ax_wc1 = plt.subplots()
+                    ax_wc1.imshow(wc_pos, interpolation='bilinear')
+                    ax_wc1.axis('off')
+                    ax_wc1.set_title("Sentimen Positif")
+                    st.pyplot(fig_wc1)
+            with col_wc2:
+                if teks_neg.strip():
+                    wc_neg = WordCloud(width=400, height=300, background_color='white', colormap='Reds', max_words=100).generate(teks_neg)
+                    fig_wc2, ax_wc2 = plt.subplots()
+                    ax_wc2.imshow(wc_neg, interpolation='bilinear')
+                    ax_wc2.axis('off')
+                    ax_wc2.set_title("Sentimen Negatif")
+                    st.pyplot(fig_wc2)
 
 with tab2:
-    st.header("Prediksi Teks Tunggal")
-    st.write("Coba masukkan teks secara manual. Sistem akan memproses dan mengklasifikasikan menggunakan model yang sudah dilatih di Fitur 1.")
+    st.header("Analisis Prediksi Teks Tunggal")
+    user_text = st.text_area("Masukkan teks untuk dianalisis:")
     
-    user_input = st.text_area("Masukkan teks:")
-    
-    if st.button("🔍 Analisis Teks"):
+    if st.button("Analisis Teks"):
         if 'nb_model' not in st.session_state or 'svm_model' not in st.session_state:
-            st.warning("⚠️ Silakan proses dan latih dataset di **Fitur 1** terlebih dahulu!")
-        elif not user_input.strip():
-            st.error("Teks tidak boleh kosong!")
+            st.error("Silakan latih model di 'Fitur 1: Analisis Dataset' terlebih dahulu sebelum menggunakan fitur ini.")
+        elif not user_text.strip():
+            st.warning("Teks tidak boleh kosong.")
         else:
-            # Pipeline preprocessing manual
-            cl_text = advanced_clean_text(user_input)
-            cf_text = cl_text.lower()
-            kamus_alay = load_kamus_alay()
-            norm_text = normalize_text(cf_text, kamus_alay)
+            # Tampilkan metrik evaluasi model (dari Tab 1)
+            st.markdown("### Performa Model Keseluruhan")
+            col_metrik1, col_metrik2 = st.columns(2)
+            with col_metrik1:
+                st.info("**Naive Bayes**\n"
+                        f"- Akurasi: {st.session_state['eval_nb']['accuracy']:.2f}\n"
+                        f"- Presisi (Macro): {st.session_state['eval_nb']['macro avg']['precision']:.2f}\n"
+                        f"- Recall (Macro): {st.session_state['eval_nb']['macro avg']['recall']:.2f}\n"
+                        f"- F1-Score (Macro): {st.session_state['eval_nb']['macro avg']['f1-score']:.2f}")
+            with col_metrik2:
+                st.info("**SVM (LinearSVC)**\n"
+                        f"- Akurasi: {st.session_state['eval_svm']['accuracy']:.2f}\n"
+                        f"- Presisi (Macro): {st.session_state['eval_svm']['macro avg']['precision']:.2f}\n"
+                        f"- Recall (Macro): {st.session_state['eval_svm']['macro avg']['recall']:.2f}\n"
+                        f"- F1-Score (Macro): {st.session_state['eval_svm']['macro avg']['f1-score']:.2f}")
+
+            # Proses Teks
+            kamus = load_kamus_alay()
+            nlp_model = load_indobertweet()
             
-            # Prediksi
-            nlp = load_indobertweet()
-            indo_label, indo_score = label_indobertweet_biner(norm_text, nlp)
+            clean_t = advanced_clean_text(user_text)
+            case_t = clean_t.lower()
+            norm_t = normalize_text(case_t, kamus)
             
-            vec = st.session_state['tfidf'].transform([norm_text])
-            nb_pred = st.session_state['nb_model'].predict(vec)[0]
-            svm_pred = st.session_state['svm_model'].predict(vec)[0]
+            # Pelabelan IndoBerTweet
+            label, score = label_indobertweet_biner(norm_t, nlp_model)
             
-            st.success("Analisis Berhasil!")
-            st.markdown(f"**Teks Setelah Preprocessing:** `{norm_text}`")
+            # Pelabelan NB & SVM
+            tfidf = st.session_state['tfidf']
+            text_tfidf = tfidf.transform([norm_t])
+            nb_pred = st.session_state['nb_model'].predict(text_tfidf)[0]
+            svm_pred = st.session_state['svm_model'].predict(text_tfidf)[0]
             
-            # Layout hasil tabel
+            st.markdown("### Hasil Prediksi Teks Anda")
+            st.write(f"**Teks Normalisasi:** {norm_t}")
+            
+            # Render Tabel Skor
             res_df = pd.DataFrame({
-                "Model": ["IndoBERTweet", "Naive Bayes", "SVM (LinearSVC)"],
-                "Prediksi Label": [indo_label, nb_pred, svm_pred],
-                "Confidence/Score": [f"{indo_score:.4f}", "-", "-"]
+                "Metode": ["IndoBerTweet", "Naive Bayes", "SVM"],
+                "Label Sentimen": [label, nb_pred, svm_pred],
+                "Confidence Score": [f"{score:.4f}", "-", "-"]
             })
             st.table(res_df)
-            
-            st.divider()
-            st.subheader("Metrik Performa Model (Berdasarkan Data Latih Saat Ini)")
-            m = st.session_state['metrics']
-            c1, c2 = st.columns(2)
-            with c1:
-                st.markdown(f"**Naive Bayes (Akurasi: {m['nb_acc']:.2%})**")
-                st.text(m['nb_report'])
-            with c2:
-                st.markdown(f"**SVM (Akurasi: {m['svm_acc']:.2%})**")
-                st.text(m['svm_report'])
