@@ -52,19 +52,19 @@ Alur kerja metodologis yang diterapkan dalam penelitian dan diimplementasikan ke
 
 ```mermaid
 flowchart TD
-    A[Data Crawling via Tweet-Harvest <br>18.484 tweet mentah] --> B[Preprocessing Pipeline]
-    B --> B1[1. Text Cleaning: Hapus URL, Tagar, Mention, Simbol, Angka]
-    B1 --> B2[2. Case Folding: Lowercase]
-    B2 --> B3[3. Filtering: Rentang Tahun 2022-2025 & Keyword Polri]
-    B3 --> B4[4. Normalization: Kamus Colloquial Indonesian Lexicon]
-    B4 --> C[Data Bersih: 14.382 Baris]
-    C --> D[Pelabelan Otomatis IndoBERTweet<br>Positif: 7.969 | Negatif: 6.413]
-    D --> E[Stratified Data Split<br>Rasio 90:10 | 80:20 | 70:30]
-    E --> F[Ekstraksi Fitur TF-IDF<br>Unigram + Bigram, Sublinear TF, Max Features 5000]
-    F --> G1[Model Multinomial Naïve Bayes]
-    F --> G2[Model Linear SVM]
-    G1 & G2 --> H[Evaluasi Model: Confusion Matrix, Akurasi, Presisi, Recall, F1-Score]
-    D --> I[Visualisasi Word Cloud & Document Frequency]
+    A["Data Crawling via Tweet-Harvest<br>(18.484 tweet mentah)"] --> B["Preprocessing Pipeline"]
+    B --> B1["1. Text Cleaning: Hapus URL, Tagar, Mention, Simbol, Angka"]
+    B1 --> B2["2. Case Folding: Lowercase"]
+    B2 --> B3["3. Filtering: Rentang Tahun 2022-2025 & Keyword Polri"]
+    B3 --> B4["4. Normalization: Kamus Colloquial Indonesian Lexicon"]
+    B4 --> C["Data Bersih: 14.382 Baris"]
+    C --> D["Pelabelan Otomatis IndoBERTweet<br>(Positif: 7.969 & Negatif: 6.413)"]
+    D --> E["Stratified Data Split<br>(Rasio 90:10, 80:20, 70:30)"]
+    E --> F["Ekstraksi Fitur TF-IDF<br>(Unigram + Bigram, Sublinear TF, Max Features 5000)"]
+    F --> G1["Model Multinomial Naive Bayes"]
+    F --> G2["Model Linear SVM"]
+    G1 & G2 --> H["Evaluasi Model: Confusion Matrix, Akurasi, Presisi, Recall, F1-Score"]
+    D --> I["Visualisasi Word Cloud & Document Frequency"]
 ```
 
 ---
