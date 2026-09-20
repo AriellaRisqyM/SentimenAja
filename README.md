@@ -17,6 +17,7 @@
 - [Modul & Fitur Aplikasi](#-modul--fitur-aplikasi)
 - [Panduan Instalasi & Menjalankan Aplikasi](#-panduan-instalasi--menjalankan-aplikasi)
 - [Struktur Direktori](#-struktur-direktori)
+- [Daftar Pustaka](#-daftar-pustaka)
 - [Sitasi & Hak Cipta](#-sitasi--hak-cipta)
 
 ---
@@ -176,6 +177,37 @@ SentimenAja/
 ├── LICENSE                # Lisensi Apache-2.0
 └── .gitignore             # File pengecualian Git
 ```
+
+---
+
+## 📚 Daftar Pustaka
+
+1. **Aardiiiy.** (2025). *indobertweet-base-Indonesian-sentiment-analysis* (Revision 01ef069). Hugging Face. [https://doi.org/10.57967/hf/5111](https://doi.org/10.57967/hf/5111)
+2. **Baihaqi, M. F., Magdalena, L., & Fahrudin, R.** (2025). Analisis Sentimen Aplikasi Deepseek Menggunakan Metode Naive Bayes dan Support Vector Machine. *RIGGS: Journal of Artificial Intelligence and Digital Business*, 4(3), 4051–4062. [https://doi.org/10.31004/riggs.v4i3.2511](https://doi.org/10.31004/riggs.v4i3.2511)
+3. **Bill Fatric Ginting, S., Novarina Tarigan, E., Sihaloho, B., Telaumbanua, J., & Sehati, Stik.** (2025). Analisis Sentimen Opini Publik terhadap Rumah Sakit Pemerintah dan Swasta di Indonesia Menggunakan Algoritma Naïve Bayes. (Vol. 10, No. 01).
+4. **Damayanti, N. M., Ariningtyas, I. D., & Icham, M. I. A.** (2025). ANALISIS SENTIMEN PUBLIK PADA TAGAR #BTSCOMEBACK DI PLATFORM X MENGGUNAKAN INDOBERTWEET. *Jurnal Informatika Dan Teknik Elektro Terapan*, 13(3). [https://doi.org/10.23960/jitet.v13i3.7176](https://doi.org/10.23960/jitet.v13i3.7176)
+5. **Dewi, C., Chen, R.-C., Christanto, H. J., & Cauteruccio, F.** (2023). Multinomial Naïve Bayes Classifier for Sentiment Analysis of Internet Movie Database. *Vietnam Journal of Computer Science*, 10(04), 485–498. [https://doi.org/10.1142/S2196888823500100](https://doi.org/10.1142/S2196888823500100)
+6. **Enhartana, A. C., Saputra, Z., Sapata Negara, A. S., Wahyudi, A. S., Hidayanto, A. N., & Suryono, R. R.** (2025). Machine Learning Approach to Evaluate Public Perception: Sentiment Analysis of Mobile Government App User Reviews. *2025 International Conference on Informatics, Multimedia, Cyber and Information System (ICIMCIS)*, 1487–1492. [https://doi.org/10.1109/ICIMCIS68501.2025.11326982](https://doi.org/10.1109/ICIMCIS68501.2025.11326982)
+7. **Hanin, A. S., & Maryam, M.** (2025). Sentiment Analysis of Twitter Towards the Free Lunch Program Using the C4.5 Algorithm. *International Journal of Advances in Data and Information Systems*, 6(1), 31–45. [https://doi.org/10.59395/ijadis.v6i1.1357](https://doi.org/10.59395/ijadis.v6i1.1357)
+8. **Imaddudin, S., Astuti, I., & Ruhama, S.** (2025). Studi Sentimen Masyarakat terhadap PSSI di Era Erick Thohir menggunakan Algoritma Support Vector Machine (SVM) pada Media Sosial X. *Jurnal Penelitian Multidisiplin Bangsa*, 1(8), 1003–1013. [https://doi.org/10.59837/jpnmb.v1i8.193](https://doi.org/10.59837/jpnmb.v1i8.193)
+9. **Jannah, N. Z. B., & Kusnawi, K.** (2024). Comparison of Naïve Bayes and SVM in Sentiment Analysis of Product Reviews on Marketplaces. *Sinkron*, 8(2), 727–733. [https://doi.org/10.33395/sinkron.v8i2.13559](https://doi.org/10.33395/sinkron.v8i2.13559)
+10. **Kurniawan, F., Muliya Ma, A., & Roosita Cindrakasih, R.** (2025). Pemolisian dan Media: Dinamika Representasi dan Dampaknya pada Persepsi Publik. *Journal Of Social Science Research*, 5, 2107–2122.
+11. **Maulana, B. A., Fahmi, M. J., Imran, A. M., & Hidayati, N.** (2024). Analisis Sentimen Terhadap Aplikasi Pluang Menggunakan Algoritma Naive Bayes dan Support Vector Machine (SVM). *MALCOM: Indonesian Journal of Machine Learning and Computer Science*, 4(2), 375–384. [https://doi.org/10.57152/malcom.v4i2.1206](https://doi.org/10.57152/malcom.v4i2.1206)
+12. **Ningsih, W., Alfianda, B., Rahmaddeni, R., & Wulandari, D.** (2024). Perbandingan Algoritma SVM dan Naïve Bayes dalam Analisis Sentimen Twitter pada Penggunaan Mobil Listrik di Indonesia. *MALCOM: Indonesian Journal of Machine Learning and Computer Science*, 4(2), 556–562. [https://doi.org/10.57152/malcom.v4i2.1253](https://doi.org/10.57152/malcom.v4i2.1253)
+13. **Nurhaliza Agustina, C. A., Novita, R., Mustakim, & Rozanda, N. E.** (2024). The Implementation of TF-IDF and Word2Vec on Booster Vaccine Sentiment Analysis Using Support Vector Machine Algorithm. *Procedia Computer Science*, 234, 156–163. [https://doi.org/10.1016/j.procs.2024.02.162](https://doi.org/10.1016/j.procs.2024.02.162)
+14. **Nurpandi, F., Sulaeman, F. S., & Hermawan, A.** (2024). Analisis Sentimen Terhadap Kinerja Kepolisian Indonesia Menggunakan Metode Multinomial Naive Bayes, Long Short-Term Memory, dan Lexicon-Based. *Media Jurnal Informatika*, 16(1), 1. [https://doi.org/10.35194/mji.v16i1.4165](https://doi.org/10.35194/mji.v16i1.4165)
+15. **Putri, V. P., Rahmawati, S. F., & Zia, A.** (2023). Kajian Terhadap Penggunaan Internet Terkait Etika Bersosial Media Dengan Melihat Hukum Di Indonesia Dalam Melindungi Masyarakatnya. *Das Sollen: Jurnal Kajian Kontemporer Hukum Dan Masyarakat*, 02(01).
+16. **Ramadhani, B., & Suryono, R. R.** (2024). Komparasi Algoritma Naïve Bayes dan Logistic Regression Untuk Analisis Sentimen Metaverse. *JURNAL MEDIA INFORMATIKA BUDIDARMA*, 8(2), 714. [https://doi.org/10.30865/mib.v8i2.7458](https://doi.org/10.30865/mib.v8i2.7458)
+17. **Ramdhan Hakiki, Pambudi, A., & Asriyanik.** (2024). Classification of Public Sentiment Toward 2024 Presidential Candidates on Social Media Platform X Using Naïve Bayes Algorithm. *Journal of Artificial Intelligence and Engineering Applications (JAIEA)*, 3(2), 551–556. [https://doi.org/10.59934/jaiea.v3i2.422](https://doi.org/10.59934/jaiea.v3i2.422)
+18. **Salsa Desia Fitri, & Parjito.** (2025). Perbandingan Metode Naïve Bayes dan Support Vector Machine Pada Kasus Pembunuhan Vina Cirebon Berdasarkan Data X. *JUSTINDO (Jurnal Sistem Dan Teknologi Informasi Indonesia)*, 10(1), 39–49. [https://doi.org/10.32528/justindo.v10i1.2550](https://doi.org/10.32528/justindo.v10i1.2550)
+19. **Sarah, D. F., Khaira, U., & Putri, M. F.** (2025). Analisis Sentimen Aplikasi Shopeepay Menggunakan Naïve Bayes Dan Pemodelan Topik Latent Dirichlet Allocation. *Djtechno: Jurnal Teknologi Informasi*, 6(2), 402–416. [https://doi.org/10.46576/djtechno.v6i2.6586](https://doi.org/10.46576/djtechno.v6i2.6586)
+20. **Sari B, I., Wajidi, F., & Rasyid, Muh. R.** (2025). Implementasi Support Vector Machine Untuk Analisis Sentimen Robot Polisi Humanoid. *Simtek: Jurnal Sistem Informasi Dan Teknik Komputer*, 10(2), 329–335. [https://doi.org/10.51876/simtek.v10i2.1623](https://doi.org/10.51876/simtek.v10i2.1623)
+21. **Setiawan, A., & Suryono, R. R.** (2024). Analisis Sentimen Ibu Kota Nusantara menggunakan Algoritma Support Vector Machine dan Naïve Bayes. *Edumatic: Jurnal Pendidikan Informatika*, 8(1), 183–192. [https://doi.org/10.29408/edumatic.v8i1.25667](https://doi.org/10.29408/edumatic.v8i1.25667)
+22. **Sudirman, Y., & Dwi Sartika Simatupang.** (2025). Analisis Sentimen Berbasis Aspek Pada Ulasan Hotel Xyz Di Kota Tangerang Dengan Algoritma Svm. *STORAGE: Jurnal Ilmiah Teknik Dan Ilmu Komputer*, 4(4), 370–377. [https://doi.org/10.55123/storage.v4i4.6611](https://doi.org/10.55123/storage.v4i4.6611)
+23. **Syam, Abd. A., Hardy M, G., Salim, A., Surianto, D. F., & Fajar B, M.** (2024). Analisis Teknik Preprocessing Pada Sentimen Masyarakat Terkait Konflik Israel-Palestina Menggunakan Support Vector Machine. *JIPI (Jurnal Ilmiah Penelitian Dan Pembelajaran Informatika)*, 9(3), 1464–1472. [https://doi.org/10.29100/jipi.v9i3.5527](https://doi.org/10.29100/jipi.v9i3.5527)
+24. **Wahyudi, D., & Sibaroni, Y.** (2022). Deep Learning for Multi-Aspect Sentiment Analysis of TikTok App using the RNN-LSTM Method. *Building of Informatics, Technology and Science (BITS)*, 4(1). [https://doi.org/10.47065/bits.v4i1.1665](https://doi.org/10.47065/bits.v4i1.1665)
+25. **Yusran, M., Siswanto, S., & Islamiyati, A.** (n.d.). *SISTEMASI: Jurnal Sistem Informasi Comparison of Multinomial Naïve Bayes and Bernoulli Naïve Bayes on Sentiment Analysis of Kurikulum Merdeka with Query Expansion Ranking*. [http://sistemasi.ftik.unisi.ac.id](http://sistemasi.ftik.unisi.ac.id)
+26. **Zufria, I., Lubis, A. H., & Febiyaula, S. S.** (2024). Analisis Sentimen Kepercayaan Masyarakat Terhadap Kepolisian Republik Indonesia Menggunakan Algoritma Svm. *Journal of Science and Social Research*, (3). [http://jurnal.goretanpena.com/index.php/JSSR](http://jurnal.goretanpena.com/index.php/JSSR)
 
 ---
 
